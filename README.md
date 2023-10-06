@@ -1,10 +1,10 @@
 # nflsportsapi
 
 
-1 Make sure to have the installed libraries at the top
+1. Make sure to have the installed libraries at the top
 pandas, requests bs4(BeautifulSoup), time, os, datetime
-2 Enter the year of the season you want to extract for, EX main(2022) format
-3 Their will be 6 new csv files that will be saved
+2. Enter the year of the season you want to extract for, EX main(2022)
+3. 6 new csv files will be created
 
 passing_advanced > columns > Player,Tm,Cmp,Att,Yds,1D,1D%,IAY,IAY/PA,CAY,CAY/Cmp,CAY/PA,YAC,YAC/Cmp,Drops,Drop%,BadTh,Bad%,Sk,Bltz,Hrry,Hits,Prss,Prss%,Scrm,Yds/Scr,Pos,Num,Pct,Num.1,Pct.1,Num.2,Pct.2,Starter,Date,Link
 
