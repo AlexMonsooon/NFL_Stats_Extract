@@ -18,7 +18,7 @@ pandas, requests, bs4(BeautifulSoup), time, os, datetime, numpy, StringIO
       Lost,Turnovers,Penalties-Yards,Third Down Conv.,Fourth Down Conv.,Time of Possession,Link,season,Week,Day
       
    4. NFL_Passing-{season}.csv >>>
-      Player,Tm,Cmp,Att,Yds,1D,1D%,IAY,IAY/PA,CAY,CAY/Cmp,CAY/PA,YAC,YAC/Cmp,Drops, Drop%,BadTh,Bad%,Sk,Bltz,Hrry,Hits,Prss,Prss%,Scrm,Yds/Scr,Pos ,Num,Pct,Num.1,Pct.1,Num.2,Pct.2,Starter,Date,Link,season, Pass_TDs,QB_Int, 
+      Player,Tm,Cmp,Att,Yds,1D,1D%,IAY,IAY/PA,CAY,CAY/Cmp,CAY/PA, YAC,YAC/Cmp,Drops,Drop%,BadTh,Bad%,Sk,Bltz,Hrry,Hits,Prss,Prss%,Scrm,Yds/Scr,Pos,Num,Pct,Num.1,Pct.1,Num.2,Pct.2, Starter,Date,Link,season, Pass_TDs,QB_Int, 
       QB_SackedYards,Pass_Lng,QB_Rate,Off_Fmb,Off_Fmb_Lost
       
    5. NFL_Rushing-{season}.csv >>>
