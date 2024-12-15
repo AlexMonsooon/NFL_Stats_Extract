@@ -22,7 +22,7 @@ pandas, requests, bs4(BeautifulSoup), time, os, datetime, numpy, StringIO
       QB_SackedYards,Pass_Lng,QB_Rate,Off_Fmb,Off_Fmb_Lost
       
    5. NFL_Rushing-{season}.csv >>>
-      Player,Tm,Att,Yds,Rushing_TDs,1D,YBC,YBC/Att,YAC,YAC/Att,BrkTkl,Att/Br,Pos,Num,Pct,Num.1,Pct.1,Num.2, Pct.2,Starter,Date,Link,season,Rushing_Lng,Off_Fmb,Off_Fmb_Lost
+      Player,Tm,Att,Yds,Rushing_TDs,1D,YBC,YBC/Att,YAC,YAC/Att,BrkTkl,Att/Br,Pos, Num,Pct,Num.1,Pct.1,Num.2,Pct.2,Starter,Date,Link,season,Rushing_Lng,Off_Fmb,Off_Fmb_Lost
       
    6. NFL_Receiving-{season}.csv >>>
       Player,Tm,Tgt,Rec,Yds,Receiving_TDs,1D,YBC,YBC/R,YAC,YAC/R,ADOT,BrkTkl,Rec/Br,Drop,Drop%,Int,Rat,Pos,Num,Pct,Num.1,Pct.1,Num.2,Pct.2,Starter,Date,Link,season,Receiving_Lng,Off_Fmb,Off_Fmb_Lost
