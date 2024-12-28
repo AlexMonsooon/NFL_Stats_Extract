@@ -103,12 +103,23 @@ def scorebox(soup):
     # extract date, start time and stadium
     meta = score_containers.find(class_='scorebox_meta')
     divs = meta.find_all('div')
+    
     date = divs[0].text.strip()
     dateo = datetime.strptime(date, '%A %b %d, %Y')
     formatted_date = dateo.strftime('%Y-%m-%d')
     
-    start_time = divs[1].text.strip().split(": ")[1]
-    stadium = divs[2].text.strip().split(": ")[1]
+    ### sometimes missing stadium and Start time, make sure to grab right value
+    ### else just set value to nan
+    start_time, stadium = np.nan, np.nan
+    for div in divs:
+        text = div.text.strip()
+        if text.startswith("Start Time:"):
+            start_time = text.split(": ")[1]
+        elif text.startswith("Stadium:"):
+            stadium = text.split(": ")[1]
+
+    #start_time = divs[1].text.strip().split(": ")[1]
+    #stadium = divs[2].text.strip().split(": ")[1]
 
     # Determine the win/loss
     if away_score > home_score:
@@ -184,25 +195,8 @@ def clean_merge_df(soup, dataframes):
     com = pd.concat([gameinfo2, team_stats_df], axis=1).reset_index(drop=True)
     stats_game_info_df = pd.concat([scorebox_df, com], axis=1)
     
-    home_starters = set(dataframes['home_starters']['Player'])
-    vis_starters = set(dataframes['vis_starters']['Player'])
-    
-    # see what players are starters from snap counts and add 1/0
-    dataframes['home_snap_counts']['Starter'] = dataframes['home_snap_counts']['Player'].apply(lambda player: 1 if player in home_starters else 0)
-    dataframes['vis_snap_counts']['Starter'] = dataframes['vis_snap_counts']['Player'].apply(lambda player: 1 if player in vis_starters else 0)
-    
-    snap_counts_df = pd.concat([dataframes['home_snap_counts'], dataframes['vis_snap_counts']], axis=0)
-    
-    merged_dfs = ['passing_advanced', 'rushing_advanced', 'receiving_advanced',
-              'defense_advanced', 'kicking']
-    
-    # loops through merged_dfs and adds 1/0 to each df in Starter col
-    final_df_dict = {}
-    for df_name in merged_dfs:
-        merged_df = pd.merge(dataframes[df_name], snap_counts_df, on=common_columns(dataframes[df_name], snap_counts_df), how='left')
-        final_df_dict[df_name] = merged_df
         
-    return final_df_dict, stats_game_info_df, away_name, home_name
+    return stats_game_info_df, away_name, home_name
 ################################################################################
     
 # if file exists append to it, else make a new one with that filename
@@ -251,9 +245,9 @@ def main(season, flag):
         games_df.loc[:, 'Date'] = pd.to_datetime(games_df['Date'], format='%Y-%m-%d').dt.date
         
         games_df = games_df.rename(columns={'Unnamed: 7': 'Link'})
-        games_df['season'] = season
+        games_df['Season'] = season
         
-        games_df = games_df[['Week','Day','Date','Link','season']]
+        games_df = games_df[['Week','Day','Date','Link','Season']]
         
         # Week,Day,Date,Link,season
         save(games_df, all_matchups)
@@ -292,7 +286,6 @@ def main(season, flag):
                 
 ###############################################################################
 
-
     for link_url in allgames:
         print(link_url)
         
@@ -300,29 +293,61 @@ def main(season, flag):
         soup = get_soup('https://www.pro-football-reference.com' + link_url)
         dataframes = extract_tables(soup, tnames, tables, use_comments=True)
         
-        rush_rec_pass_def_kick_dict, stats_game_info_df, away_name, home_name = clean_merge_df(soup, dataframes)
+        stats_game_info_df, away_name, home_name = clean_merge_df(soup, dataframes)
         
         stats_game_info_df['Date'] = pd.to_datetime(stats_game_info_df['Date'], format='%Y-%m-%d').dt.date
         stats_game_info_df['Link'] = link_url
-        stats_game_info_df['season'] = season
+        stats_game_info_df['Season'] = season
         
         nfl_games_df = pd.merge(stats_game_info_df, games_df, on=common_columns(stats_game_info_df, games_df), how='left')
-        
+        date_value = nfl_games_df.iloc[0]['Date']
+
         # FullTeam,PF,Result,PA,Opp,Record,Start_Time,Stadium,Coach,Date,HA,Won Toss,
         # Won OT Toss,Roof,Surface,Duration,Attendance,Weather,Vegas Line,Over/Under,
         # Tm,First Downs,Rush-Yds-TDs,Cmp-Att-Yd-TD-INT,Sacked-Yards,Net Pass Yards,
         # Total Yards,Fumbles-Lost,Turnovers,Penalties-Yards,Third Down Conv.,
         # Fourth Down Conv.,Time of Possession,Link,season,Week,Day
-        save(nfl_games_df, gamepath)         
         
-        date_value = nfl_games_df.iloc[0]['Date']
+        save(nfl_games_df, gamepath)  
         
+        #######################################################################
+        # dataframes already used
+        items_to_remove = ['game_info', 'team_stats']
+        tnames = [item for item in tnames if item not in items_to_remove]
         
-        for key, df in rush_rec_pass_def_kick_dict.items():
-            df['Date'] = date_value
-            df['Link'] = link_url
-            df['season'] = season
+        # Loop through dfs and update only the keys present in new tnames
+        for key in tnames:
+            if key in dataframes:
+                df = dataframes[key]
+                df['Date'] = date_value
+                df['Link'] = link_url
+                df['Season'] = season
+                
+        #######################################################################
+        home_starters = set(dataframes['home_starters']['Player'])
+        vis_starters = set(dataframes['vis_starters']['Player'])
         
+        dataframes['home_snap_counts']['Starter'] = dataframes['home_snap_counts']['Player'].apply(lambda player: 1 if player in home_starters else 0)
+        dataframes['vis_snap_counts']['Starter'] = dataframes['vis_snap_counts']['Player'].apply(lambda player: 1 if player in vis_starters else 0)
+        
+        dataframes['home_snap_counts']['Tm'] = home_name
+        dataframes['vis_snap_counts']['Tm'] = away_name
+        
+        snap_counts_df = pd.concat([dataframes['home_snap_counts'], dataframes['vis_snap_counts']], ignore_index=True)
+        snap_counts_df['Tm'] = snap_counts_df['Tm'].replace(reverse_team_mapping)
+        
+        # Player,Pos,Num,Pct,Num.1,Pct.1,Num.2,Pct.2,Starter,Tm,Date,Link,season
+        save(snap_counts_df, f'NFL_Snap_Counts-{season}.csv')
+
+        ########################################################################   
+        merged_dfs = ['passing_advanced', 'rushing_advanced', 'receiving_advanced','defense_advanced']
+        
+        # loops through merged_dfs and adds 1/0 to each df in Starter col
+        for df_name in merged_dfs:
+            merged_df = pd.merge(dataframes[df_name], snap_counts_df, on=common_columns(dataframes[df_name], snap_counts_df), how='left')
+            dataframes[df_name] = merged_df
+
+        #######################################################################
         off_dict = {}
         pass_rush_rec_df = extract_tables(soup, ['player_offense'], off_dict, use_comments=False)
         filtered_off_df = pass_rush_rec_df['player_offense'][['Player', 'Tm', 'TD', 'TD.1','TD.2', 'Int', 'Yds.1', 'Lng', 'Rate', 'Lng.1', 'Lng.2', 'Fmb', 'FL']]
@@ -330,7 +355,7 @@ def main(season, flag):
         filtered_off_df = filtered_off_df.rename(columns={'Lng': 'Pass_Lng', 'Rate': 'QB_Rate', 'Lng.1': 'Rushing_Lng', 'Lng.2': 'Receiving_Lng', 'Fmb': 'Off_Fmb', 'FL': 'Off_Fmb_Lost'})
         filtered_off_df['Link'] = link_url
         
-        temp_pass = rush_rec_pass_def_kick_dict['passing_advanced']
+        temp_pass = dataframes['passing_advanced']
         pcol = ['Player', 'Tm', 'Link', 'Pass_TDs', 'QB_Int', 'QB_SackedYards', 'Pass_Lng', 'QB_Rate', 'Off_Fmb', 'Off_Fmb_Lost']
         pass_filt_df = filtered_off_df[pcol]
         merged_df = pd.merge(temp_pass, pass_filt_df, on=['Player', 'Tm', 'Link'], how='left')
@@ -339,25 +364,24 @@ def main(season, flag):
         # Drops,Drop%,BadTh,Bad%,Sk,Bltz,Hrry,Hits,Prss,Prss%,Scrm,Yds/Scr,Pos,
         # Num,Pct,Num.1,Pct.1,Num.2,Pct.2,Starter,Date,Link,season,Pass_TDs,QB_Int,
         # QB_SackedYards,Pass_Lng,QB_Rate,Off_Fmb,Off_Fmb_Lost
-        save(merged_df, f'NFL_Passing-{season}.csv')
         
+        save(merged_df, f'NFL_Passing-{season}.csv')       
         
-        
-        temp_rush = rush_rec_pass_def_kick_dict['rushing_advanced']   
+        #######################################################################
+        temp_rush = dataframes['rushing_advanced']   
         temp_rush = temp_rush.rename(columns={'TD': 'Rushing_TDs'})
         rushcol = ['Player', 'Tm', 'Link', 'Rushing_TDs', 'Rushing_Lng', 'Off_Fmb', 'Off_Fmb_Lost']
         rush_filt_df = filtered_off_df[rushcol]
-        
         merged_df = pd.merge(temp_rush, rush_filt_df, on=['Player', 'Tm', 'Link', 'Rushing_TDs'], how='left')
         
         # Player,Tm,Att,Yds,Rushing_TDs,1D,YBC,YBC/Att,YAC,YAC/Att,BrkTkl,Att/Br,
         # Pos,Num,Pct,Num.1,Pct.1,Num.2,Pct.2,Starter,Date,Link,season,Rushing_Lng,
         # Off_Fmb,Off_Fmb_Lost
+        
         save(merged_df, f'NFL_Rushing-{season}.csv')
-            
-            
-            
-        temp_rec = rush_rec_pass_def_kick_dict['receiving_advanced']    
+        
+        #######################################################################            
+        temp_rec = dataframes['receiving_advanced']    
         temp_rec = temp_rec.rename(columns={'TD': 'Receiving_TDs'})
         reccol = ['Player', 'Tm', 'Link', 'Receiving_TDs', 'Receiving_Lng', 'Off_Fmb', 'Off_Fmb_Lost']
         rec_filt_df = filtered_off_df[reccol]
@@ -367,100 +391,64 @@ def main(season, flag):
         # Player,Tm,Tgt,Rec,Yds,Receiving_TDs,1D,YBC,YBC/R,YAC,YAC/R,ADOT,BrkTkl,
         # Rec/Br,Drop,Drop%,Int,Rat,Pos,Num,Pct,Num.1,Pct.1,Num.2,Pct.2,Starter,
         # Date,Link,season,Receiving_Lng,Off_Fmb,Off_Fmb_Lost
-        save(merged_df, f'NFL_Receiving-{season}.csv')     
-            
-            
-    
-        filtered_defense_df = dataframes['player_defense'][['Player', 'Tm', 'PD', 'TFL', 'QBHits', 'FR', 'FF']].copy()
-        filtered_defense_df.loc[:, 'Link'] = link_url
-
-        temp_df = rush_rec_pass_def_kick_dict['defense_advanced']         
+        
+        save(merged_df, f'NFL_Receiving-{season}.csv')    
+        
+        #######################################################################
+        filtered_defense_df = dataframes['player_defense'][['Player', 'Tm', 'PD', 'TFL', 'QBHits', 'FR', 'FF', 'Link']]
+        temp_df = dataframes['defense_advanced']         
         merged_df = pd.merge(temp_df, filtered_defense_df, on=['Player', 'Tm', 'Link'], how='left')
         
         # Player,Tm,Int,Tgt,Cmp,Cmp%,Yds,Yds/Cmp,Yds/Tgt,TD,Rat,DADOT,Air,YAC,Bltz,
         # Hrry,QBKD,Sk,Prss,Comb,MTkl,MTkl%,Pos,Num,Pct,Num.1,Pct.1,Num.2,Pct.2,
         # Starter,Date,Link,season,PD,TFL,QBHits,FR,FF
+        
         save(merged_df, f'NFL_Defense-{season}.csv')
 
-
-
+        ########################################################################
         kicking = dataframes['kicking']
-        kicking['Date'] = date_value
-        kicking['Link'] = link_url
-        kicking['season'] = season
-        
         # Player,Tm,XPM,XPA,FGM,FGA,Pnt,Yds,Y/P,Lng,Date,Link,season
         save(kicking, f'NFL_Kicking-{season}.csv')
-        
 
-
+        ########################################################################
         dataframes['home_starters']['Tm'] = home_name
         dataframes['vis_starters']['Tm'] = away_name
 
         starters = pd.concat([dataframes['home_starters'], dataframes['vis_starters']], ignore_index=True)
-        starters['Date'] = date_value
-        starters['Link'] = link_url
-        starters['season'] = season
-        
         starters['Tm'] = starters['Tm'].replace(reverse_team_mapping)
         
         # Player,Pos,Tm,Date,Link,season
+
         save(starters, f'NFL_Starters-{season}.csv')
 
-        
-        
+        #########################################################################
         dataframes['home_drives']['Tm'] = home_name
         dataframes['vis_drives']['Tm'] = away_name
         
         drives = pd.concat([dataframes['home_drives'], dataframes['vis_drives']], ignore_index=True)
-        drives['Date'] = date_value
-        drives['Link'] = link_url
-        drives['season'] = season
         
         drives = drives.rename(columns={'#': 'Drive_Num'})
         drives['Tm'] = drives['Tm'].replace(reverse_team_mapping)
         
         # Drive_Num,Quarter,Time,LOS,Plays,Length,Net Yds,Result,Tm,Date,Link,season
         save(drives, f'NFL_Drives-{season}.csv')
-        
-        
-        
-        dataframes['home_snap_counts']['Tm'] = home_name
-        dataframes['vis_snap_counts']['Tm'] = away_name
-        
-        snap_counts_df = pd.concat([dataframes['home_snap_counts'], dataframes['vis_snap_counts']], ignore_index=True)
-        snap_counts_df['Date'] = date_value
-        snap_counts_df['Link'] = link_url
-        snap_counts_df['season'] = season
-        
-        snap_counts_df['Tm'] = snap_counts_df['Tm'].replace(reverse_team_mapping)
-        
-        # Player,Pos,Num,Pct,Num.1,Pct.1,Num.2,Pct.2,Starter,Tm,Date,Link,season
-        save(snap_counts_df, f'NFL_Snap_Counts-{season}.csv')
-        
-        
 
+        #######################################################################
         officials = dataframes['officials']
         officials = officials.rename(columns={0: 'Pos', 1: 'Name'})
-        officials['Date'] = date_value
-        officials['Link'] = link_url
-        officials['season'] = season
         
         # Pos,Name,Date,Link,season
         save(officials, f'NFL_Officials-{season}.csv')
         
-        
-        
+        #######################################################################
         pbp_df = dataframes['pbp']
-        pbp_df['Date'] = date_value
-        pbp_df['Link'] = link_url
-        pbp_df['season'] = season
+        columns_to_rename = pbp_df.columns[5:7] 
+        pbp_df = pbp_df.rename(columns={columns_to_rename[0]: 'Away_Points', columns_to_rename[1]: 'Home_Points'})
         
-        # Quarter,Time,Down,ToGo,Location,DEN,CAR,Detail,EPB,EPA,Date,Link,season
+        # Quarter,Time,Down,ToGo,Location,Away_Points,Home_Points,Detail,EPB,EPA,Date,Link,season
         save(pbp_df, f'NFL_Pbp-{season}.csv')
         
-        
-        
+        #######################################################################
         # update record that matches Link and Date record 
         temp_df_game = pd.read_csv(used_matchups)
         temp_df_game['Date'] = pd.to_datetime(temp_df_game['Date']).dt.date
@@ -475,6 +463,9 @@ def main(season, flag):
 
 ### will get - 3 days from current date... so it will get full seasons if previous years called
 ### will check matchups_path to see if getting data from current season
-# have to call true for first run of a new season if the whole season is not over
-main(2022, True)
+### have to call true for first run of a new season if the whole season is not over
+main(2024, False)
+
+
+
 
